@@ -1,0 +1,30 @@
+{
+  "name": "АвтоРадар — автомобили Латвии",
+  "short_name": "АвтоРадар",
+  "description": "Локальная база и рейтинги автомобилей Латвии",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#09111e",
+  "theme_color": "#101a2a",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "id": "./"
+}

@@ -20,6 +20,13 @@ if(typeof c.price!=='number')throw Error('Не указана цена');numeric
 for(const key of ['year','mileage_km','hp','score'])numeric(c[key],key);
 for(const key of ['make','model','city','engine','body','gearbox','interior','status','notes','first_seen','last_checked'])if(c[key]!=null&&typeof c[key]!=='string')throw Error('Некорректное поле: '+key);
 if(c.url!=null&&c.url!==''){if(typeof c.url!=='string')throw Error('Некорректная ссылка');const u=new URL(c.url);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw Error('Недопустимая ссылка')}
+for(const key of ['ta_verified','registration_verified','ta_csdd_verified'])if(c[key]!=null&&typeof c[key]!=='boolean')throw Error('Некорректный флаг: '+key);
+if(c.ta_until!=null&&!isTaDate(c.ta_until))throw Error('Некорректный срок TA');
+if(c.ta_source!=null&&!['listing','csdd'].includes(c.ta_source))throw Error('Некорректный источник TA');
+if(c.ta_check_status!=null&&!['found','not_stated','unavailable','conflict'].includes(c.ta_check_status))throw Error('Некорректный статус TA');
+for(const key of ['ta_checked_at','source_checked_at'])if(c[key]!=null&&(typeof c[key]!=='string'||!Number.isFinite(Date.parse(c[key]))))throw Error('Некорректная дата: '+key);
+for(const key of ['ta_evidence','ta_check_error'])if(c[key]!=null&&typeof c[key]!=='string')throw Error('Некорректное поле: '+key);
+if(c.ta_source_url!=null){if(typeof c.ta_source_url!=='string')throw Error('Некорректная ссылка TA');const u=new URL(c.ta_source_url);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw Error('Недопустимая ссылка TA')}
 if(c.history!=null){if(!Array.isArray(c.history)||c.history.length>10000)throw Error('Некорректная история цен');for(const h of c.history){if(!object(h)||typeof h.date!=='string'||!h.date||!Number.isFinite(Date.parse(h.date))||typeof h.price!=='number')throw Error('Некорректная запись истории');numeric(h.price,'история цены')}}
 }
 if(data.favorites.some(id=>typeof id!=='string'||!id))throw Error('Некорректное избранное');
@@ -38,6 +45,27 @@ valid(next);return next
 function download(){const payload={...state,exported_at:new Date().toISOString()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='autoradar-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
 function sortCars(a,b){const s=$('sort').value;if(s==='price')return a.price-b.price;if(s==='year')return (b.year||0)-(a.year||0);if(s==='recent')return String(b.first_seen||'').localeCompare(String(a.first_seen||''));return (b.score||0)-(a.score||0)}
 function filtered(){const q=$('search').value.trim().toLowerCase(),max=$('maxPrice').value===''?Infinity:Math.max(0,Number($('maxPrice').value));let arr=state.cars.filter(c=>c.status!=='sold'&&c.status!=='removed'&&c.price<=max&&[c.make,c.model,c.city,c.engine].join(' ').toLowerCase().includes(q));if(tab==='suv')arr=arr.filter(c=>c.body==='suv');if(tab==='favorites')arr=arr.filter(c=>state.favorites.includes(c.id));if(tab==='brands')arr=arr.filter(c=>/volvo|bmw|nissan|mg/i.test(c.make||''));if(tab==='changes')arr=arr.filter(c=>(c.history||[]).length>1||c.status==='new');arr.sort(sortCars);if(tab==='suv'||tab==='all')arr=arr.slice(0,5);return arr}
+function isTaDate(value){
+ if(typeof value!=='string'||!/^\d{4}-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/.test(value))return false;
+ const [y,m,d]=value.split('-').map(Number);if(y<1900||y>2199)return false;if(!d)return true;
+ const date=new Date(Date.UTC(y,m-1,d));return date.getUTCFullYear()===y&&date.getUTCMonth()===m-1&&date.getUTCDate()===d
+}
+function taInfo(car,today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Riga',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())){
+ const source=car.ta_source==='listing'?'По объявлению':car.ta_source==='csdd'&&car.ta_csdd_verified===true?'По CSDD':'Источник не указан';
+ if(car.ta_check_status==='conflict')return {label:'TA: данные расходятся',source};
+ if(isTaDate(car.ta_until)){
+  const [year,month,day]=car.ta_until.split('-');const date=day?`${day}.${month}.${year}`:`${month}.${year}`;
+  const expired=day?car.ta_until<today:car.ta_until<today.slice(0,7);
+  const currentMonth=!day&&car.ta_until===today.slice(0,7);
+  const stale=car.ta_check_status==='unavailable';
+  const suffix=stale?'ранее':source==='По объявлению'?'по объявлению':source==='По CSDD'?'CSDD':'источник не указан';
+  return {label:expired?`TA истёк: ${date} · ${suffix}`:currentMonth?`TA ${date} · уточнить день`:`TA до ${date} · ${suffix}`,source}
+ }
+ if(car.ta_check_status==='unavailable')return {label:'TA: страницу не удалось проверить',source};
+ if(car.ta_csdd_verified===true)return {label:'TA: CSDD проверено, срок не указан',source};
+ return {label:car.ta_verified===true?'TA указан · срок неизвестен':'TA: срок не указан',source}
+}
+
 let lastTop='suv';
 const icon=name=>`<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 function navigate(next){tab=next;if(next==='suv'||next==='all')lastTop=next;$('mainContent').scrollTop=0;render()}
@@ -51,7 +79,7 @@ function render(){
  document.querySelectorAll('#tabs [data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
  document.querySelectorAll('#mobileTabs [data-mobile-tab]').forEach(b=>{if(b.dataset.mobileTab===(['suv','all'].includes(tab)?'top':tab))b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
  $('topSwitch').hidden=!['suv','all'].includes(tab);document.querySelectorAll('[data-top]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.top===tab)));
- $('content').innerHTML=cars.length?cars.map(c=>`<article class="car"><div class="car-title"><div><h3>${esc(c.make)} ${esc(c.model)}</h3><div class="sub">${esc(c.year||'Год не указан')} · ${esc(c.mileage_km==null?'Пробег неизвестен':new Intl.NumberFormat('ru-RU').format(c.mileage_km)+' км')} · ${esc(c.city||'Город неизвестен')}</div></div><button class="fav ${state.favorites.includes(c.id)?'on':''}" data-fav="${esc(c.id)}" aria-label="Избранное: ${esc(c.make)} ${esc(c.model)}" aria-pressed="${state.favorites.includes(c.id)}">${icon('heart')}</button></div><div class="car-top"><strong class="price">${money(c.price)}</strong><span class="score" aria-label="Рейтинг ${esc(c.score??'не указан')}">${icon('star')}${c.score==null?'—':esc(Number(c.score).toFixed(1))}</span></div><div class="spec">${esc(c.engine||'Двигатель не указан')} · ${esc(c.gearbox||'КПП неизвестна')} · ${esc(c.interior||'Салон не проверен')}</div><div class="car-bottom"><span class="car-status">${c.demo?'<span class="small-badge">ДЕМО</span>':''}${c.status==='new'?'<span class="small-badge">НОВИНКА</span>':''}${c.ta_verified?'TA подтверждён':'TA не подтверждён'}</span><span class="card-links"><button class="text-button" data-detail="${esc(c.id)}">Подробнее →</button>${c.url?`<a class="link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">Объявление ↗</a>`:''}</span></div></article>`).join(''):emptyState();
+ $('content').innerHTML=cars.length?cars.map(c=>`<article class="car"><div class="car-title"><div><h3>${esc(c.make)} ${esc(c.model)}</h3><div class="sub">${esc(c.year||'Год не указан')} · ${esc(c.mileage_km==null?'Пробег неизвестен':new Intl.NumberFormat('ru-RU').format(c.mileage_km)+' км')} · ${esc(c.city||'Город неизвестен')}</div></div><button class="fav ${state.favorites.includes(c.id)?'on':''}" data-fav="${esc(c.id)}" aria-label="Избранное: ${esc(c.make)} ${esc(c.model)}" aria-pressed="${state.favorites.includes(c.id)}">${icon('heart')}</button></div><div class="car-top"><strong class="price">${money(c.price)}</strong><span class="score" aria-label="Рейтинг ${esc(c.score??'не указан')}">${icon('star')}${c.score==null?'—':esc(Number(c.score).toFixed(1))}</span></div><div class="spec">${esc(c.engine||'Двигатель не указан')} · ${esc(c.gearbox||'КПП неизвестна')} · ${esc(c.interior||'Салон не проверен')}</div><div class="car-bottom"><span class="car-status">${c.demo?'<span class="small-badge">ДЕМО</span>':''}${c.status==='new'?'<span class="small-badge">НОВИНКА</span>':''}${esc(taInfo(c).label)}</span><span class="card-links"><button class="text-button" data-detail="${esc(c.id)}">Подробнее →</button>${c.url?`<a class="link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">Объявление ↗</a>`:''}</span></div></article>`).join(''):emptyState();
 }
 function emptyState(){
  const title=tab==='changes'?'Изменений пока нет':tab==='favorites'?'В избранном пока пусто':state.cars.length?'Ничего не найдено':'Добавь первую базу';
@@ -63,8 +91,8 @@ function emptyState(){
 function detail(id){
  const c=state.cars.find(x=>x.id===id);if(!c)return;
  const body={suv:'Кроссовер',wagon:'Универсал',sedan:'Седан'};
- const pairs=[['Кузов',body[c.body]||c.body],['Год',c.year],['Пробег',c.mileage_km==null?'—':new Intl.NumberFormat('ru-RU').format(c.mileage_km)+' км'],['Двигатель',c.engine],['Мощность',c.hp?c.hp+' л.с.':'—'],['КПП',c.gearbox],['Салон',c.interior],['Город',c.city],['Регистрация LV',c.registration_verified?'Подтверждена':'Не подтверждена'],['Техосмотр',c.ta_verified?'Подтверждён':'Не подтверждён'],['Последняя проверка',date(c.last_checked)],['Статус',c.status]];
- $('detailBody').innerHTML=`<h2>${esc(c.make)} ${esc(c.model)}</h2><p class="price">${money(c.price)}</p><div class="detailgrid">${pairs.map(([k,v])=>`<div><small>${esc(k)}</small>${esc(v??'—')}</div>`).join('')}</div><h3>История цены</h3><ul class="history">${(c.history||[]).map(h=>`<li>${esc(h.date)} — ${money(h.price)}</li>`).join('')||'<li>Нет истории</li>'}</ul><p>${esc(c.notes||'Комментариев пока нет.')}</p>${c.demo?'<p class="fine">Вымышленный автомобиль для проверки интерфейса.</p>':''}${c.url?`<p><a class="link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">Открыть оригинальное объявление ↗</a></p>`:''}`;
+ const pairs=[['Кузов',body[c.body]||c.body],['Год',c.year],['Пробег',c.mileage_km==null?'—':new Intl.NumberFormat('ru-RU').format(c.mileage_km)+' км'],['Двигатель',c.engine],['Мощность',c.hp?c.hp+' л.с.':'—'],['КПП',c.gearbox],['Салон',c.interior],['Город',c.city],['Регистрация LV',c.registration_verified?'Подтверждена':'Не подтверждена'],['Техосмотр',taInfo(c).label],['Источник TA',taInfo(c).source],['Проверка TA по CSDD',c.ta_csdd_verified===true?'Подтверждена':'Не подтверждена'],['Дата проверки TA',date(c.ta_checked_at)],['Последняя проверка',date(c.last_checked)],['Статус',c.status]];
+ $('detailBody').innerHTML=`<h2>${esc(c.make)} ${esc(c.model)}</h2><p class="price">${money(c.price)}</p><div class="detailgrid">${pairs.map(([k,v])=>`<div><small>${esc(k)}</small>${esc(v??'—')}</div>`).join('')}</div>${c.ta_evidence?'<p class="fine">'+esc(c.ta_evidence)+'</p>':''}${c.ta_check_error?'<p class="fine">'+esc(c.ta_check_error)+'</p>':''}${c.ta_source_url?'<p><a class="link" href="'+esc(c.ta_source_url)+'" target="_blank" rel="noopener noreferrer">Источник срока TA ↗</a></p>':''}<h3>История цены</h3><ul class="history">${(c.history||[]).map(h=>`<li>${esc(h.date)} — ${money(h.price)}</li>`).join('')||'<li>Нет истории</li>'}</ul><p>${esc(c.notes||'Комментариев пока нет.')}</p>${c.demo?'<p class="fine">Вымышленный автомобиль для проверки интерфейса.</p>':''}${c.url?`<p><a class="link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">Открыть оригинальное объявление ↗</a></p>`:''}`;
  $('detailDialog').showModal()
 }
 async function doImport(file){
@@ -113,7 +141,7 @@ async function checkAppUpdate(manual=false){
   await appRegistration.update();
   const worker=appRegistration.installing;
   if(worker)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{worker.removeEventListener('statechange',done);reject(Error('timeout'))},15000);function done(){if(['installed','activated','redundant'].includes(worker.state)){clearTimeout(timer);worker.removeEventListener('statechange',done);worker.state==='redundant'?reject(Error('install')):resolve()}}worker.addEventListener('statechange',done);done()});
-  offerAppUpdate();if(!appRegistration.waiting&&manual)$('appUpdateStatus').textContent='Установлена актуальная версия 2.0.0.'
+  offerAppUpdate();if(!appRegistration.waiting&&manual)$('appUpdateStatus').textContent='Установлена актуальная версия 2.0.1.'
  }catch(e){if(manual)$('appUpdateStatus').textContent='Проверка не завершена. Проверь интернет и попробуй снова.'}finally{if(manual)$('checkAppUpdate').disabled=false}
 }
 $('checkAppUpdate').onclick=()=>checkAppUpdate(true);

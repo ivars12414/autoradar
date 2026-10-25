@@ -9,8 +9,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css?v=2.0.2">
-  <script src="app.js?v=2.0.2" defer></script>
+  <link rel="stylesheet" href="style.css?v=2.0.3">
+  <script src="app.js?v=2.0.3" defer></script>
   <title>АвтоРадар · Латвия</title>
 </head>
 <body>
@@ -41,13 +41,13 @@
         <button data-tab="brands"><svg class="icon" aria-hidden="true"><use href="#i-car"/></svg>Модели</button>
         <button data-tab="favorites"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg>Избранное<span id="sideFav" class="nav-count">0</span></button>
         <button data-tab="changes"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg>Изменения</button>
-      </nav><div class="sidebar-note">Данные на устройстве<br><span>AutoRadar <span class="app-version">2.0.2</span></span></div></aside>
+      </nav><div class="sidebar-note">Данные на устройстве<br><span>AutoRadar <span class="app-version">2.0.3</span></span></div></aside>
       <main id="mainContent" class="main-content">
         <div class="section-heading"><div><h1 id="sectionTitle">Обзор объявлений</h1><p id="sectionHint">Загрузка базы…</p></div><span id="demoLabel" class="demo-label" hidden>ДЕМО</span></div>
         <div id="topSwitch" class="top-switch" role="group" aria-label="Подборка ТОП-5" hidden><button data-top="suv" aria-pressed="true">Кроссоверы</button><button data-top="all" aria-pressed="false">Все кузова</button></div>
-        <div class="filters"><label class="search-field">Поиск<input id="search" type="search" placeholder="Марка, модель, город…" aria-label="Поиск автомобилей"></label><label>Цена до, €<input id="maxPrice" type="number" min="0" step="500" value="17000" aria-label="Максимальная цена"></label><label>Сортировка<select id="sort" aria-label="Сортировка"><option value="score">По рейтингу</option><option value="price">По цене</option><option value="year">По году</option><option value="recent">Новые сначала</option></select></label></div>
+        <div class="filters"><label class="search-field">Поиск<input id="search" type="search" placeholder="Марка, модель…" aria-label="Поиск автомобилей"></label><label>Город<select id="cityFilter" aria-label="Город"><option value="">Все города</option></select></label><label>Цена до, €<input id="maxPrice" type="number" min="0" step="500" value="17000" aria-label="Максимальная цена"></label><label>Сортировка<select id="sort" aria-label="Сортировка"><option value="score">По рейтингу</option><option value="price">По цене</option><option value="year">По году</option><option value="recent">Новые сначала</option></select></label></div>
         <div id="content" class="cards" aria-live="polite"></div>
-        <footer class="content-footer"><span id="dbStatus" role="status">Открываем базу…</span><span>AutoRadar <span class="app-version">2.0.2</span></span></footer>
+        <footer class="content-footer"><span id="dbStatus" role="status">Открываем базу…</span><span>AutoRadar <span class="app-version">2.0.3</span></span></footer>
       </main>
     </div>
     <nav id="mobileTabs" class="bottom-nav" aria-label="Нижняя навигация">
@@ -61,6 +61,6 @@
   <input type="file" id="filePicker" accept=".json,application/json" hidden>
   <dialog id="detailDialog" aria-label="Подробности автомобиля"><div id="detailBody"></div><button id="closeDialog" class="button full">Закрыть</button></dialog>
   <dialog id="syncDialog" aria-labelledby="syncTitle"><h2 id="syncTitle">Обновление через ChatGPT</h2><ol><li>Экспортируй текущую базу.</li><li>Прикрепи JSON к сообщению в ChatGPT: <strong>«Обнови АвтоРадар по этому файлу»</strong>.</li><li>Импортируй обновлённый файл обратно.</li></ol><div class="dialog-actions"><button id="syncExport" class="button primary">Скачать базу</button><button id="syncImport" class="button">Импорт результата</button></div><p class="fine">Эта кнопка обновляет объявления через файл. Для обновления самого приложения используй «База → Проверить обновление».</p><button id="syncClose" class="button full">Закрыть</button></dialog>
-  <dialog id="baseDialog" aria-labelledby="baseTitle"><h2 id="baseTitle">База и резервная копия</h2><p>Данные остаются на этом устройстве. JSON-файл позволяет сохранить копию или перенести базу на другой телефон.</p><div class="dialog-actions"><button id="exportBtn" class="button primary">Экспорт JSON</button><button id="importBtn" class="button">Импорт JSON</button></div><h3>Приложение</h3><div class="dialog-actions"><button id="installBtn" class="button">Установить приложение</button><button id="checkAppUpdate" class="button">Проверить обновление</button></div><div class="dialog-actions"><button id="installAppUpdate" class="button primary" hidden>Перезапустить приложение</button></div><p id="appUpdateStatus" class="fine" role="status">Версия 2.0.2</p><h3>Демо и очистка</h3><div class="dialog-actions"><button id="demoBtn" class="button">Добавить демо</button><button id="clearBtn" class="button danger">Очистить базу</button></div><p class="fine">Демо-автомобили вымышлены. Перед очисткой базы сохрани экспорт. Не очищай данные сайта для обновления приложения.</p><button id="baseClose" class="button full">Закрыть</button></dialog>
+  <dialog id="baseDialog" aria-labelledby="baseTitle"><h2 id="baseTitle">База и резервная копия</h2><p>Данные остаются на этом устройстве. JSON-файл позволяет сохранить копию или перенести базу на другой телефон.</p><div class="dialog-actions"><button id="exportBtn" class="button primary">Экспорт JSON</button><button id="importBtn" class="button">Импорт JSON</button></div><h3>Приложение</h3><div class="dialog-actions"><button id="installBtn" class="button">Установить приложение</button><button id="checkAppUpdate" class="button">Проверить обновление</button></div><div class="dialog-actions"><button id="installAppUpdate" class="button primary" hidden>Перезапустить приложение</button></div><p id="appUpdateStatus" class="fine" role="status">Версия 2.0.3</p><h3>Демо и очистка</h3><div class="dialog-actions"><button id="demoBtn" class="button">Добавить демо</button><button id="clearBtn" class="button danger">Очистить базу</button></div><p class="fine">Демо-автомобили вымышлены. Перед очисткой базы сохрани экспорт. Не очищай данные сайта для обновления приложения.</p><button id="baseClose" class="button full">Закрыть</button></dialog>
 </body>
 </html>

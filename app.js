@@ -31,6 +31,7 @@ if(c.history!=null){if(!Array.isArray(c.history)||c.history.length>10000)throw E
 }
 if(data.favorites.some(id=>typeof id!=='string'||!id))throw Error('Некорректное избранное');
 if(data.events.some(e=>!object(e)||(e.id!=null&&typeof e.id!=='string')))throw Error('Некорректные события');
+if(data.settings?.cityFilter!=null&&typeof data.settings.cityFilter!=='string')throw Error('Некорректная настройка города');
 if(data.settings!=null){if(!object(data.settings))throw Error('Некорректные настройки');numeric(data.settings.maxPrice,'максимальная цена')}
 for(const k of ['updated_at','exported_at'])if(data[k]!=null&&(typeof data[k]!=='string'||!Number.isFinite(Date.parse(data[k]))))throw Error('Некорректная дата: '+k);
 return true
@@ -44,7 +45,16 @@ valid(next);return next
 }
 function download(){const payload={...state,exported_at:new Date().toISOString()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='autoradar-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
 function sortCars(a,b){const s=$('sort').value;if(s==='price')return a.price-b.price;if(s==='year')return (b.year||0)-(a.year||0);if(s==='recent')return String(b.first_seen||'').localeCompare(String(a.first_seen||''));return (b.score||0)-(a.score||0)}
-function filtered(){const q=$('search').value.trim().toLowerCase(),max=$('maxPrice').value===''?Infinity:Math.max(0,Number($('maxPrice').value));let arr=state.cars.filter(c=>c.status!=='sold'&&c.status!=='removed'&&c.price<=max&&[c.make,c.model,c.city,c.engine].join(' ').toLowerCase().includes(q));if(tab==='suv')arr=arr.filter(c=>c.body==='suv');if(tab==='favorites')arr=arr.filter(c=>state.favorites.includes(c.id));if(tab==='brands')arr=arr.filter(c=>/volvo|bmw|nissan|mg/i.test(c.make||''));if(tab==='changes')arr=arr.filter(c=>(c.history||[]).length>1||c.status==='new');arr.sort(sortCars);if(tab==='suv'||tab==='all')arr=arr.slice(0,5);return arr}
+function cityInfo(city){const label=String(city??'').normalize('NFKC').trim().replace(/\s+/g,' ');return label?{key:'city:'+label.toLocaleLowerCase('ru-RU'),label}:{key:'missing',label:'Город не указан'}}
+function updateCityOptions(selected=$('cityFilter').value){
+ const select=$('cityFilter'),places=new Map();
+ for(const car of state.cars){if(['sold','removed'].includes(car.status))continue;const city=cityInfo(car.city);if(!places.has(city.key))places.set(city.key,city.label)}
+ const options=[...places].sort((a,b)=>a[0]==='missing'?1:b[0]==='missing'?-1:a[1].localeCompare(b[1],'ru'));
+ if(selected&&!places.has(selected)){const old=[...select.options].find(o=>o.value===selected);options.push([selected,(old?.textContent||selected.replace(/^city:/,'')).replace(/ · нет объявлений$/,'')+' · нет объявлений'])}
+ select.innerHTML='<option value="">Все города</option>'+options.map(([value,label])=>'<option value="'+esc(value)+'">'+esc(label)+'</option>').join('');
+ select.value=selected||''
+}
+function filtered(){const q=$('search').value.trim().toLowerCase(),max=$('maxPrice').value===''?Infinity:Math.max(0,Number($('maxPrice').value));const city=$('cityFilter').value;let arr=state.cars.filter(c=>(!city||cityInfo(c.city).key===city)&&c.status!=='sold'&&c.status!=='removed'&&c.price<=max&&[c.make,c.model,c.city,c.engine].join(' ').toLowerCase().includes(q));if(tab==='suv')arr=arr.filter(c=>c.body==='suv');if(tab==='favorites')arr=arr.filter(c=>state.favorites.includes(c.id));if(tab==='brands')arr=arr.filter(c=>/volvo|bmw|nissan|mg/i.test(c.make||''));if(tab==='changes')arr=arr.filter(c=>(c.history||[]).length>1||c.status==='new');arr.sort(sortCars);if(tab==='suv'||tab==='all')arr=arr.slice(0,5);return arr}
 function isTaDate(value){
  if(typeof value!=='string'||!/^\d{4}-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/.test(value))return false;
  const [y,m,d]=value.split('-').map(Number);if(y<1900||y>2199)return false;if(!d)return true;
@@ -70,6 +80,7 @@ let lastTop='suv';
 const icon=name=>`<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 function navigate(next){tab=next;if(next==='suv'||next==='all')lastTop=next;$('mainContent').scrollTop=0;render()}
 function render(){
+ updateCityOptions();
  const names={overview:'Обзор объявлений',suv:'ТОП-5 кроссоверов',all:'ТОП-5 всех кузовов',brands:'Любимые марки',favorites:'Избранное',changes:'Изменения и цены'};
  const cars=filtered(),active=state.cars.filter(c=>!['sold','removed'].includes(c.status));
  $('sectionTitle').textContent=names[tab];$('sectionHint').textContent=cars.length+' из '+state.cars.length+' автомобилей';
@@ -83,7 +94,7 @@ function render(){
 }
 function emptyState(){
  const title=tab==='changes'?'Изменений пока нет':tab==='favorites'?'В избранном пока пусто':state.cars.length?'Ничего не найдено':'Добавь первую базу';
- const text=tab==='changes'?'После импорта обновлённой базы здесь появятся новые объявления и изменения цен.':tab==='favorites'?'Нажми сердечко на карточке, чтобы сохранить машину.':state.cars.length?'Попробуй изменить поиск или максимальную цену.':'Импортируй JSON с объявлениями или добавь демо для знакомства с приложением.';
+ const text=tab==='changes'?'После импорта обновлённой базы здесь появятся новые объявления и изменения цен.':tab==='favorites'?'Нажми сердечко на карточке, чтобы сохранить машину.':state.cars.length?'Попробуй изменить город, поиск или максимальную цену.':'Импортируй JSON с объявлениями или добавь демо для знакомства с приложением.';
  const action=tab==='changes'?'sync':tab==='favorites'?'overview':state.cars.length?'reset':'base';
  const label={sync:'Как обновить базу',overview:'К объявлениям',reset:'Сбросить фильтры',base:'Открыть базу'}[action];
  return `<div class="empty"><strong>${title}</strong><p>${text}</p><button class="button" data-empty="${action}">${label}</button></div>`
@@ -97,24 +108,24 @@ function detail(id){
 }
 async function doImport(file){
  if(!file)return false;if(file.size>15*1024*1024){alert('Максимальный размер JSON: 15 МБ');return false}
- try{const data=JSON.parse(await file.text());await change(current=>merge(data,current));$('maxPrice').value=state.settings?.maxPrice??'';render();alert('База обновлена. Автомобилей: '+state.cars.length);return true}catch(e){alert('Не удалось импортировать: '+e.message);return false}
+ try{const data=JSON.parse(await file.text());await change(current=>merge(data,current));updateCityOptions(state.settings?.cityFilter??'');$('maxPrice').value=state.settings?.maxPrice??'';render();alert('База обновлена. Автомобилей: '+state.cars.length);return true}catch(e){alert('Не удалось импортировать: '+e.message);return false}
 }
 function bind(){
  document.querySelectorAll('#tabs [data-tab]').forEach(b=>b.onclick=()=>navigate(b.dataset.tab));
  document.querySelectorAll('#mobileTabs [data-mobile-tab]').forEach(b=>b.onclick=()=>navigate(b.dataset.mobileTab==='top'?lastTop:b.dataset.mobileTab));
  document.querySelectorAll('[data-top]').forEach(b=>b.onclick=()=>navigate(b.dataset.top));
- $('sort').onchange=render;$('search').oninput=render;
+ $('sort').onchange=render;$('search').oninput=render;$('cityFilter').onchange=()=>{const cityFilter=$('cityFilter').value;change(current=>({...current,settings:{...current.settings,cityFilter}})).catch(report)};
  $('maxPrice').oninput=()=>{render();const maxPrice=$('maxPrice').value===''?null:Math.max(0,Number($('maxPrice').value));change(current=>({...current,settings:{...current.settings,maxPrice}})).catch(report)};
  $('content').onclick=async e=>{
   const fav=e.target.closest('[data-fav]');if(fav){const id=fav.dataset.fav;try{await change(current=>({...current,favorites:current.favorites.includes(id)?current.favorites.filter(x=>x!==id):[...current.favorites,id]}))}catch(err){report(err)}return}
   const d=e.target.closest('[data-detail]');if(d)detail(d.dataset.detail);
-  const empty=e.target.closest('[data-empty]');if(empty){if(empty.dataset.empty==='sync')$('syncDialog').showModal();else if(empty.dataset.empty==='base')$('baseDialog').showModal();else if(empty.dataset.empty==='overview')navigate('overview');else{$('search').value='';$('maxPrice').value=17000;try{await change(current=>({...current,settings:{...current.settings,maxPrice:17000}}))}catch(err){report(err)}}}
+  const empty=e.target.closest('[data-empty]');if(empty){if(empty.dataset.empty==='sync')$('syncDialog').showModal();else if(empty.dataset.empty==='base')$('baseDialog').showModal();else if(empty.dataset.empty==='overview')navigate('overview');else{$('search').value='';$('cityFilter').value='';$('maxPrice').value=17000;try{await change(current=>({...current,settings:{...current.settings,maxPrice:17000,cityFilter:''}}))}catch(err){report(err)}}}
  };
  ['exportBtn','syncExport'].forEach(id=>$(id).onclick=async()=>{await writes;download()});
  ['importBtn','syncImport'].forEach(id=>$(id).onclick=()=>$('filePicker').click());
  $('filePicker').onchange=async e=>{const imported=await doImport(e.target.files[0]);e.target.value='';if(imported){$('syncDialog').close();$('baseDialog').close()}};
  $('demoBtn').onclick=async()=>{try{await change(current=>({...current,cars:[...current.cars,...sample.filter(c=>!current.cars.some(x=>x.id===c.id))]}));$('baseDialog').close()}catch(e){report(e)}};
- $('clearBtn').onclick=async()=>{if(confirm('Удалить ВСЮ локальную базу? Сначала экспортируй резервную копию.')){try{await change(()=>({schema_version:1,exported_at:null,updated_at:null,cars:[],favorites:[],events:[],settings:{maxPrice:17000}}));$('maxPrice').value=17000;render();$('baseDialog').close()}catch(e){report(e)}}};
+ $('clearBtn').onclick=async()=>{if(confirm('Удалить ВСЮ локальную базу? Сначала экспортируй резервную копию.')){try{await change(()=>({schema_version:1,exported_at:null,updated_at:null,cars:[],favorites:[],events:[],settings:{maxPrice:17000}}));$('maxPrice').value=17000;$('cityFilter').value='';render();$('baseDialog').close()}catch(e){report(e)}}};
  $('baseBtn').onclick=()=>$('baseDialog').showModal();$('baseClose').onclick=()=>$('baseDialog').close();
  $('updateBtn').onclick=()=>$('syncDialog').showModal();$('syncClose').onclick=()=>$('syncDialog').close();$('closeDialog').onclick=()=>$('detailDialog').close();
  for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close()}});
@@ -141,11 +152,11 @@ async function checkAppUpdate(manual=false){
   await appRegistration.update();
   const worker=appRegistration.installing;
   if(worker)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{worker.removeEventListener('statechange',done);reject(Error('timeout'))},15000);function done(){if(['installed','activated','redundant'].includes(worker.state)){clearTimeout(timer);worker.removeEventListener('statechange',done);worker.state==='redundant'?reject(Error('install')):resolve()}}worker.addEventListener('statechange',done);done()});
-  offerAppUpdate();if(!appRegistration.waiting&&manual)$('appUpdateStatus').textContent='Установлена актуальная версия 2.0.2.'
+  offerAppUpdate();if(!appRegistration.waiting&&manual)$('appUpdateStatus').textContent='Установлена актуальная версия 2.0.3.'
  }catch(e){if(manual)$('appUpdateStatus').textContent='Проверка не завершена. Проверь интернет и попробуй снова.'}finally{if(manual)$('checkAppUpdate').disabled=false}
 }
 $('checkAppUpdate').onclick=()=>checkAppUpdate(true);
 async function applyWaitingUpdate(){if(!appRegistration?.waiting)return;await writes;reloadForUpdate=true;appRegistration.waiting.postMessage({type:'SKIP_WAITING'})}
 $('applyUpdate').onclick=applyWaitingUpdate;$('installAppUpdate').onclick=applyWaitingUpdate;
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkAppUpdate()});window.addEventListener('online',()=>checkAppUpdate());
-(async()=>{bind();try{state=(await read())||state;valid(state);$('maxPrice').value=state.settings?.maxPrice??'';render()}catch(e){$('dbStatus').textContent='Ошибка открытия базы';alert('Не удалось открыть IndexedDB: '+e.message)}await registerAppWorker()})();
+(async()=>{bind();try{state=(await read())||state;valid(state);$('maxPrice').value=state.settings?.maxPrice??'';updateCityOptions(state.settings?.cityFilter??'');render()}catch(e){$('dbStatus').textContent='Ошибка открытия базы';alert('Не удалось открыть IndexedDB: '+e.message)}await registerAppWorker()})();

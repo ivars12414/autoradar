@@ -1,7 +1,7 @@
 'use strict';
 const PREFIX='autoradar-'+new URL(self.registration.scope).pathname.replace(/[^a-z0-9]/gi,'_')+'-';
-const CACHE=PREFIX+'v4-2.0.1';
-const ASSETS=['./','./index.html','./style.css?v=2.0.1','./app.js?v=2.0.1','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE=PREFIX+'v4-2.0.2';
+const ASSETS=['./','./index.html','./style.css?v=2.0.2','./app.js?v=2.0.2','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
 const assetPaths=new Set(ASSETS.map(path=>new URL(path,self.registration.scope).pathname));
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('message',e=>{if(e.data?.type==='SKIP_WAITING')self.skipWaiting()});

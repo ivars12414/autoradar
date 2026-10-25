@@ -141,7 +141,7 @@ async function checkAppUpdate(manual=false){
   await appRegistration.update();
   const worker=appRegistration.installing;
   if(worker)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{worker.removeEventListener('statechange',done);reject(Error('timeout'))},15000);function done(){if(['installed','activated','redundant'].includes(worker.state)){clearTimeout(timer);worker.removeEventListener('statechange',done);worker.state==='redundant'?reject(Error('install')):resolve()}}worker.addEventListener('statechange',done);done()});
-  offerAppUpdate();if(!appRegistration.waiting&&manual)$('appUpdateStatus').textContent='Установлена актуальная версия 2.0.1.'
+  offerAppUpdate();if(!appRegistration.waiting&&manual)$('appUpdateStatus').textContent='Установлена актуальная версия 2.0.2.'
  }catch(e){if(manual)$('appUpdateStatus').textContent='Проверка не завершена. Проверь интернет и попробуй снова.'}finally{if(manual)$('checkAppUpdate').disabled=false}
 }
 $('checkAppUpdate').onclick=()=>checkAppUpdate(true);
